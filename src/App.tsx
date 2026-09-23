@@ -24,6 +24,7 @@ import {
 } from "@mantine/core";
 import { Calendar } from "@mantine/dates";
 import { useDisclosure } from "@mantine/hooks";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   IconCalendarEvent,
   IconCheck,
@@ -31,7 +32,7 @@ import {
   IconRefresh,
   IconTrash,
 } from "@tabler/icons-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { api } from "./api";
 import {
@@ -160,12 +161,8 @@ export function App() {
   const [cursor, setCursor] = useState(iso(new Date()));
   const [selected, setSelected] = useState(iso(new Date()));
   const [mode, setMode] = useState<"day" | "week">("day");
-  const [practices, setPractices] = useState<Practice[]>([]);
-  const [events, setEvents] = useState<EventItem[]>([]);
-  const [illustrations, setIllustrations] = useState<IllustrationEntry[]>([]);
-  const [weekSummary, setWeekSummary] = useState<Summary | null>(null);
-  const [monthSummary, setMonthSummary] = useState<Summary | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [events] = useState<EventItem[]>([]);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [eventOpened, eventModal] = useDisclosure(false);
   const [editingEvent, setEditingEvent] = useState<EventItem | null>(null);
 
@@ -173,111 +170,83 @@ export function App() {
   const monthTo = monthEndOf(cursor);
   const weekFrom = weekStartOf(selected);
   const weekTo = weekEndOf(selected);
-  const summaryCache = useRef(new Map<string, Promise<Summary>>());
-  const practiceCache = useRef(new Map<string, Promise<Practice[]>>());
-  const illustrationCache = useRef(
-    new Map<string, Promise<IllustrationEntry[]>>(),
+  const queryClient = useQueryClient();
+  const summaryStarts = Array.from(
+    new Set([...monthWeekStarts(monthFrom, monthTo), weekFrom]),
   );
+  const practicesQuery = useQuery({
+    queryKey: ["practices", monthFrom, monthTo],
+    queryFn: () => api.practices(monthFrom, monthTo),
+  });
+  const illustrationsQuery = useQuery({
+    queryKey: ["illustrations", weekFrom, weekTo],
+    queryFn: () => api.illustrations(weekFrom, weekTo),
+  });
+  const summariesQuery = useQuery({
+    queryKey: ["summaries", monthFrom, monthTo, weekFrom],
+    queryFn: async () => {
+      const summaries: Summary[] = [];
+      for (const start of summaryStarts) {
+        summaries.push(await api.summary(start, weekEndOf(start)));
+      }
+      return summaries;
+    },
+  });
+  const practices = practicesQuery.data ?? [];
+  const illustrations = illustrationsQuery.data ?? [];
+  const summaries = summariesQuery.data ?? [];
+  const weekSummary = summaries.find((summary) => summary.from === weekFrom) ?? null;
+  const monthSummary = summaries.length
+    ? combineSummaries(summaries, monthFrom, monthTo)
+    : null;
 
-  const cached = useCallback(<T,>(
-    cache: Map<string, Promise<T>>,
-    key: string,
-    request: () => Promise<T>,
-  ) => {
-    const existing = cache.get(key);
-    if (existing) return existing;
-    const pending = request().catch((error) => {
-      cache.delete(key);
-      throw error;
-    });
-    cache.set(key, pending);
-    return pending;
-  }, []);
-
-  const loadSummaries = useCallback(async () => {
-    const summaryStarts = Array.from(
-      new Set([...monthWeekStarts(monthFrom, monthTo), weekFrom]),
-    );
-    const summaries: Summary[] = [];
-    for (const start of summaryStarts) {
-      const end = weekEndOf(start);
-      summaries.push(
-        await cached(summaryCache.current, `${start}:${end}`, () =>
-          api.summary(start, end),
-        ),
-      );
-    }
-    const week = summaries.find((summary) => summary.from === weekFrom);
-    if (!week) throw new Error("週次サマリーを取得できませんでした");
-    setWeekSummary(week);
-    setMonthSummary(combineSummaries(summaries, monthFrom, monthTo));
-  }, [cached, monthFrom, monthTo, weekFrom]);
-
-  const loadPractices = useCallback(async () => {
-    setPractices(
-      await cached(practiceCache.current, `${monthFrom}:${monthTo}`, () =>
-        api.practices(monthFrom, monthTo),
-      ),
-    );
-  }, [cached, monthFrom, monthTo]);
-
-  const loadIllustrations = useCallback(async () => {
-    setIllustrations(
-      await cached(illustrationCache.current, `${weekFrom}:${weekTo}`, () =>
-        api.illustrations(weekFrom, weekTo),
-      ),
-    );
-  }, [cached, weekFrom, weekTo]);
-
-  const load = useCallback(async (force = false) => {
-    if (force) {
-      summaryCache.current.clear();
-      practiceCache.current.clear();
-      illustrationCache.current.clear();
-    }
-    setIsLoading(true);
-    try {
-      await loadIllustrations();
-      await loadSummaries();
-      await loadPractices();
-    } catch (error) {
-      toast.error(
-        `読み込みに失敗しました: ${
-          error instanceof Error ? error.message : "不明なエラー"
-        }`,
-      );
-    } finally {
-      setIsLoading(false);
-    }
-  }, [loadIllustrations, loadPractices, loadSummaries]);
+  const refreshSummaries = useCallback(async () => {
+    await summariesQuery.refetch();
+  }, [summariesQuery]);
 
   const refreshPracticeData = useCallback(async () => {
-    practiceCache.current.clear();
-    summaryCache.current.clear();
-    setIsLoading(true);
+    setIsRefreshing(true);
     try {
-      await loadPractices();
-      await loadSummaries();
+      await queryClient.invalidateQueries({ queryKey: ["practices"], refetchType: "none" });
+      await practicesQuery.refetch();
+      await queryClient.invalidateQueries({ queryKey: ["summaries"], refetchType: "none" });
+      await refreshSummaries();
     } finally {
-      setIsLoading(false);
+      setIsRefreshing(false);
     }
-  }, [loadPractices, loadSummaries]);
+  }, [practicesQuery, queryClient, refreshSummaries]);
 
   const refreshIllustrationData = useCallback(async () => {
-    illustrationCache.current.clear();
-    summaryCache.current.clear();
-    setIsLoading(true);
+    setIsRefreshing(true);
     try {
-      await loadIllustrations();
-      await loadSummaries();
+      await queryClient.invalidateQueries({ queryKey: ["illustrations"], refetchType: "none" });
+      await illustrationsQuery.refetch();
+      await queryClient.invalidateQueries({ queryKey: ["summaries"], refetchType: "none" });
+      await refreshSummaries();
     } finally {
-      setIsLoading(false);
+      setIsRefreshing(false);
     }
-  }, [loadIllustrations, loadSummaries]);
+  }, [illustrationsQuery, queryClient, refreshSummaries]);
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  const refreshAllData = useCallback(async () => {
+    setIsRefreshing(true);
+    try {
+      await queryClient.invalidateQueries({ queryKey: ["illustrations"], refetchType: "none" });
+      await illustrationsQuery.refetch();
+      await queryClient.invalidateQueries({ queryKey: ["summaries"], refetchType: "none" });
+      await summariesQuery.refetch();
+      await queryClient.invalidateQueries({ queryKey: ["practices"], refetchType: "none" });
+      await practicesQuery.refetch();
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [illustrationsQuery, practicesQuery, queryClient, summariesQuery]);
+
+  const isLoading =
+    isRefreshing ||
+    practicesQuery.isPending ||
+    illustrationsQuery.isPending ||
+    summariesQuery.isPending;
 
   const producedByDate = useMemo(() => {
     const map = new Map<string, SizeCounts>();
@@ -351,7 +320,7 @@ export function App() {
             <Button
               variant="default"
               leftSection={<IconRefresh size={16} />}
-              onClick={() => void load(true)}
+              onClick={() => void refreshAllData()}
             >
               更新
             </Button>
