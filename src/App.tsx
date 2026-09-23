@@ -350,7 +350,10 @@ export function App() {
             </Button>
             <Button
               leftSection={<IconPlus size={16} />}
-              onClick={() => void openEventEditor(null)}
+              onClick={() => {
+                setEditingEvent(null);
+                eventModal.open();
+              }}
             >
               イベントを追加
             </Button>
