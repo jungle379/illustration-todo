@@ -232,6 +232,26 @@ export function App() {
     setEvents(await api.events());
   }, []);
 
+  const openEventEditor = useCallback(
+    async (event: EventItem | null) => {
+      setIsRefreshing(true);
+      try {
+        await refreshEvents();
+        setEditingEvent(event);
+        eventModal.open();
+      } catch (error) {
+        toast.error(
+          `イベントの取得に失敗しました: ${
+            error instanceof Error ? error.message : "不明なエラー"
+          }`,
+        );
+      } finally {
+        setIsRefreshing(false);
+      }
+    },
+    [eventModal, refreshEvents],
+  );
+
   const refreshAllData = useCallback(async () => {
     setIsRefreshing(true);
     try {
@@ -330,10 +350,7 @@ export function App() {
             </Button>
             <Button
               leftSection={<IconPlus size={16} />}
-              onClick={() => {
-                setEditingEvent(null);
-                eventModal.open();
-              }}
+              onClick={() => void openEventEditor(null)}
             >
               イベントを追加
             </Button>
@@ -441,8 +458,7 @@ export function App() {
                     withBorder
                     p="sm"
                     onClick={() => {
-                      setEditingEvent(event);
-                      eventModal.open();
+                      void openEventEditor(event);
                     }}
                     style={{ cursor: "pointer" }}
                   >
@@ -473,8 +489,7 @@ export function App() {
                 onPracticeChanged={refreshPracticeData}
                 onIllustrationChanged={refreshIllustrationData}
                 onEditEvent={(event) => {
-                  setEditingEvent(event);
-                  eventModal.open();
+                  void openEventEditor(event);
                 }}
               />
             ) : (
