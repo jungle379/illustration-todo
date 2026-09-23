@@ -14,6 +14,8 @@ const url = (
 const authToken = (
   process.env.TURSO_AUTH_TOKEN ?? process.env.STURSO_AUTH_TOKEN ?? ""
 ).trim();
+const clientUrl =
+  process.env.VERCEL === "1" ? url.replace(/^libsql:/, "https:") : url;
 
 if (process.env.VERCEL === "1" && (!url || url.startsWith("file:"))) {
   throw new Error(
@@ -30,6 +32,7 @@ if (process.env.VERCEL === "1" && !authToken) {
 if (process.env.VERCEL === "1") {
   console.info("Turso configuration", {
     protocol: new URL(url).protocol,
+    clientProtocol: new URL(clientUrl).protocol,
     host: new URL(url).host,
     path: new URL(url).pathname,
     tokenPresent: Boolean(authToken),
@@ -42,7 +45,7 @@ if (process.env.VERCEL === "1") {
 }
 
 export const client = createClient({
-  url,
+  url: clientUrl,
   authToken: url.startsWith("file:") ? undefined : authToken,
 });
 
