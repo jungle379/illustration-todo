@@ -53,5 +53,7 @@ export type Summary = {
   practices: {
     dailyCount: number;
     weeklyDaySlots: number;
+    dailyByDate: Record<string, number>;
+    weeklyByDate: Record<string, number>;
   };
 };

@@ -460,6 +460,19 @@ app.get("/api/summary", async (c) => {
     (p) => p.entryType === "day" && p.date && p.date >= from && p.date <= to,
   ).length;
   const weeklyDistributed = practiceDayRows.length;
+  const dailyByDate = new Map<string, number>();
+  for (const practice of practiceRows) {
+    if (practice.entryType === "day" && practice.date) {
+      dailyByDate.set(practice.date, (dailyByDate.get(practice.date) ?? 0) + 1);
+    }
+  }
+  const weeklyByDate = new Map<string, number>();
+  for (const practiceDay of practiceDayRows) {
+    weeklyByDate.set(
+      practiceDay.date,
+      (weeklyByDate.get(practiceDay.date) ?? 0) + 1,
+    );
+  }
 
   return c.json({
     from,
@@ -471,6 +484,8 @@ app.get("/api/summary", async (c) => {
     practices: {
       dailyCount: dailyPractices,
       weeklyDaySlots: weeklyDistributed,
+      dailyByDate: Object.fromEntries(dailyByDate),
+      weeklyByDate: Object.fromEntries(weeklyByDate),
     },
   });
 });

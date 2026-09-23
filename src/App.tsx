@@ -2,10 +2,12 @@ import {
   ActionIcon,
   AppShell,
   Badge,
+  Center,
   Button,
   Card,
   Checkbox,
   Group,
+  Loader,
   Modal,
   NumberInput,
   Paper,
@@ -80,6 +82,58 @@ function addCounts(a: SizeCounts, b: SizeCounts): SizeCounts {
   };
 }
 
+function monthWeekStarts(from: string, to: string) {
+  const starts: string[] = [];
+  let current = weekStartOf(from);
+  while (current <= to) {
+    starts.push(current);
+    current = iso(dayjs(current).add(7, "day"));
+  }
+  return starts;
+}
+
+function combineSummaries(
+  summaries: Summary[],
+  from: string,
+  to: string,
+): Summary {
+  const byDate: Record<string, SizeCounts> = {};
+  const dailyByDate: Record<string, number> = {};
+  const weeklyByDate: Record<string, number> = {};
+
+  for (const summary of summaries) {
+    for (const [date, counts] of Object.entries(summary.illustrations.byDate)) {
+      if (date >= from && date <= to) {
+        byDate[date] = addCounts(byDate[date] ?? emptyCounts, counts);
+      }
+    }
+    for (const [date, count] of Object.entries(summary.practices.dailyByDate)) {
+      if (date >= from && date <= to) dailyByDate[date] = count;
+    }
+    for (const [date, count] of Object.entries(summary.practices.weeklyByDate)) {
+      if (date >= from && date <= to) weeklyByDate[date] = count;
+    }
+  }
+
+  return {
+    from,
+    to,
+    illustrations: {
+      totals: Object.values(byDate).reduce(addCounts, emptyCounts),
+      byDate,
+    },
+    practices: {
+      dailyCount: Object.values(dailyByDate).reduce((sum, count) => sum + count, 0),
+      weeklyDaySlots: Object.values(weeklyByDate).reduce(
+        (sum, count) => sum + count,
+        0,
+      ),
+      dailyByDate,
+      weeklyByDate,
+    },
+  };
+}
+
 function SizePills({
   counts,
   prefix = "",
@@ -111,6 +165,7 @@ export function App() {
   const [illustrations, setIllustrations] = useState<IllustrationEntry[]>([]);
   const [weekSummary, setWeekSummary] = useState<Summary | null>(null);
   const [monthSummary, setMonthSummary] = useState<Summary | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [eventOpened, eventModal] = useDisclosure(false);
   const [editingEvent, setEditingEvent] = useState<EventItem | null>(null);
 
@@ -120,33 +175,34 @@ export function App() {
   const weekTo = weekEndOf(selected);
 
   const load = useCallback(async () => {
+    setIsLoading(true);
     try {
-      const practicesRequest = api.practices(monthFrom, monthTo);
-      const practicesForLoad = practicesRequest.then((nextPractices) => {
-        setPractices(nextPractices);
-        return nextPractices;
-      });
-      const restRequest = Promise.all([
+      const summaryStarts = Array.from(
+        new Set([...monthWeekStarts(monthFrom, monthTo), weekFrom]),
+      );
+      const [p, e, i, summaries] = await Promise.all([
+        api.practices(weekFrom, weekTo),
         api.events(),
-        api.illustrations(monthFrom, monthTo),
-        api.summary(weekFrom, weekTo),
-        api.summary(monthFrom, monthTo),
+        api.illustrations(weekFrom, weekTo),
+        Promise.all(
+          summaryStarts.map((start) => api.summary(start, weekEndOf(start))),
+        ),
       ]);
-
-      const [_, [e, i, week, month]] = await Promise.all([
-        practicesForLoad,
-        restRequest,
-      ]);
+      const week = summaries.find((summary) => summary.from === weekFrom);
+      if (!week) throw new Error("週次サマリーを取得できませんでした");
+      setPractices(p);
       setEvents(e);
       setIllustrations(i);
       setWeekSummary(week);
-      setMonthSummary(month);
+      setMonthSummary(combineSummaries(summaries, monthFrom, monthTo));
     } catch (error) {
       toast.error(
         `読み込みに失敗しました: ${
           error instanceof Error ? error.message : "不明なエラー"
         }`,
       );
+    } finally {
+      setIsLoading(false);
     }
   }, [monthFrom, monthTo, weekFrom, weekTo]);
 
@@ -197,6 +253,14 @@ export function App() {
         .sort((a, b) => a.date.localeCompare(b.date)),
     [events],
   );
+
+  if (isLoading) {
+    return (
+      <Center h="100vh">
+        <Loader size="lg" />
+      </Center>
+    );
+  }
 
   return (
     <AppShell header={{ height: 64 }} padding="md">
