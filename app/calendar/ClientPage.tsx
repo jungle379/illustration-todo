@@ -33,8 +33,9 @@ import { useAddEvent } from "@/hooks/useAddEvent";
 import { useDeleteEvent } from "@/hooks/useDeleteEvent";
 import { useUpdateEvent } from "@/hooks/useUpdateEvent";
 import { useBulkDeleteEvents } from "@/hooks/useBulkDeleteEvent";
-import { useDailyTodos, useDailyTodoMutations } from "@/hooks/useDailyTodos";
-import { useIllustrationLogs, useIllustrationLogMutations } from "@/hooks/useIllustrationLogs";
+import { useDailyTodoMutations } from "@/hooks/useDailyTodos";
+import { useIllustrationLogMutations } from "@/hooks/useIllustrationLogs";
+import { useCalendarData } from "@/hooks/useCalendarData";
 import { TileProps, Event, UserId } from "../types/type";
 
 // -----------------------------
@@ -87,6 +88,7 @@ const eventSchema = z
 
 // カレンダーページ
 export default function ClientPage() {
+  const eventFeatureEnabled = false;
   // -----------------------------
   // State
   const [date, setDate] = useState<Date>(new Date());
@@ -136,15 +138,14 @@ export default function ClientPage() {
 
   // -----------------------------
   // APIフック
-  const { data: allEvents = [], isLoading, isFetching, error, refetch } = useEvents();
-  const { data: allTodos = [], isLoading: todosLoading } = useDailyTodos();
+  const { data: allEvents = [] } = useEvents({ enabled: eventFeatureEnabled });
+  const { data: calendarData, isLoading: calendarLoading } = useCalendarData();
   const todoMutations = useDailyTodoMutations(formattedDate);
-  const { data: allLogs = [], isLoading: logsLoading } = useIllustrationLogs();
   const logMutations = useIllustrationLogMutations(formattedDate);
 
   const events = allEvents.filter((e) => e.date === formattedDate);
-  const todos = allTodos.filter((todo) => todo.date === formattedDate);
-  const logs = allLogs.filter((log) => log.date === formattedDate);
+  const todos = (calendarData?.todos ?? []).filter((todo) => todo.date === formattedDate);
+  const logs = (calendarData?.logs ?? []).filter((log) => log.date === formattedDate);
   const addEvent = useAddEvent();
   const deleteEvent = useDeleteEvent();
   const updateEvent = useUpdateEvent();
@@ -379,18 +380,10 @@ export default function ClientPage() {
 
   // -----------------------------
 
-  if (isLoading || isFetching) {
+  if (calendarLoading) {
     return (
       <Center style={{ minHeight: "100vh" }}>
         <Loader />
-      </Center>
-    );
-  }
-
-  if (error) {
-    return (
-      <Center style={{ minHeight: "100vh" }}>
-        <Box>イベントの読み込みに失敗しました。</Box>
       </Center>
     );
   }
@@ -405,31 +398,6 @@ export default function ClientPage() {
     <Stack p="md" maw={560} mx="auto" style={{ overflow: "hidden", position: "relative" }}>
       <Group align="end">
         <Title order={2}>共有カレンダー</Title>
-          <ActionIcon
-            variant="light"
-            onClick={() => refetch()}
-            aria-label="リロード"
-            style={{ marginLeft: 20 }}
-            size="lg"
-            disabled={isFetching}
-            aria-busy={isFetching}
-            title={isFetching ? "読み込み中..." : "リロード"}
-          >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <polyline points="23 4 23 10 17 10" />
-                <path d="M20.49 15a9 9 0 1 1-2.13-9.36L23 10" />
-              </svg>
-          </ActionIcon>
       </Group>
 
       <Toaster position="top-right" />
@@ -470,7 +438,7 @@ export default function ClientPage() {
               追加
             </Button>
           </Group>
-          {todosLoading ? <Loader size="sm" /> : todos.length === 0 ? (
+          {calendarLoading ? <Loader size="sm" /> : todos.length === 0 ? (
             <Text size="sm" c="dimmed">TODOはありません</Text>
           ) : todos.map((todo) => (
             <Group key={todo.id} justify="space-between" wrap="nowrap">
@@ -525,7 +493,7 @@ export default function ClientPage() {
           <Text size="sm" fw={600}>
             当日合計: 大 {illustrationTotals.large} / 中 {illustrationTotals.medium} / 小 {illustrationTotals.small}
           </Text>
-          {logsLoading ? <Loader size="sm" /> : logs.map((log) => (
+          {calendarLoading ? <Loader size="sm" /> : logs.map((log) => (
             <Group key={log.id} justify="space-between">
               <Text>大 {log.large} / 中 {log.medium} / 小 {log.small}</Text>
               <ActionIcon color="red" variant="subtle" aria-label="実績を削除" onClick={() => logMutations.remove.mutate(log.id)}>×</ActionIcon>
@@ -535,7 +503,11 @@ export default function ClientPage() {
       </Card>
 
       {/* 追加フォーム */}
-      <Card shadow="sm" p="md">
+      <Card
+        shadow="sm"
+        p="md"
+        style={{ display: eventFeatureEnabled ? undefined : "none" }}
+      >
         <Stack>
           <TextInput
             placeholder="タイトル"
@@ -599,7 +571,7 @@ export default function ClientPage() {
 
       {/* 一覧 */}
       {sortedEvents.length > 0 && (
-        <Stack>
+        <Stack style={{ display: eventFeatureEnabled ? undefined : "none" }}>
           <Group justify="space-between" align="center">
             <Box fw={700}>{format(date, "yyyy年M月d日(E)", { locale: ja })}</Box>
             {sortedEvents.filter((e) => e.user_id === "dinner").map((e: Event) => (
@@ -684,12 +656,16 @@ export default function ClientPage() {
       )}
 
       {/* 一括削除ボタン */}
-      <Button color="red" onClick={() => setBulkOpened(true)}>
+      <Button
+        color="red"
+        style={{ display: eventFeatureEnabled ? undefined : "none" }}
+        onClick={() => setBulkOpened(true)}
+      >
         一括削除
       </Button>
 
       {/* 編集モーダル */}
-      <Modal opened={opened} onClose={() => closeModal()} title="予定編集">
+      <Modal opened={eventFeatureEnabled && opened} onClose={() => closeModal()} title="予定編集">
         <Stack>
           <TextInput
             type="date"
@@ -760,7 +736,7 @@ export default function ClientPage() {
 
       {/* 削除確認モーダル */}
       <Modal
-        opened={deleteOpened}
+        opened={eventFeatureEnabled && deleteOpened}
         onClose={() => setDeleteOpened(false)}
         title="削除確認"
       >
@@ -786,7 +762,7 @@ export default function ClientPage() {
 
       {/* 一括削除モーダル */}
       <Modal
-        opened={bulkOpened}
+        opened={eventFeatureEnabled && bulkOpened}
         onClose={() => setBulkOpened(false)}
         title="一括削除"
       >

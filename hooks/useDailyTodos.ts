@@ -18,8 +18,8 @@ export function useDailyTodos() {
 
 export function useDailyTodoMutations(date: string) {
   const queryClient = useQueryClient();
-  const key = ["daily-todos"];
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: key });
+  const invalidate = () =>
+    queryClient.invalidateQueries({ queryKey: ["calendar-data"] });
 
   const add = useMutation({
     mutationFn: async (title: string) => {

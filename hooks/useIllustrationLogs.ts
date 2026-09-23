@@ -18,8 +18,8 @@ export function useIllustrationLogs() {
 
 export function useIllustrationLogMutations(date: string) {
   const queryClient = useQueryClient();
-  const key = ["illustration-logs"];
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: key });
+  const invalidate = () =>
+    queryClient.invalidateQueries({ queryKey: ["calendar-data"] });
   const add = useMutation({
     mutationFn: async (counts: Pick<IllustrationLog, "large" | "medium" | "small">) => {
       const { error } = await supabase.from("illustration_logs").insert({ date, ...counts });
