@@ -1,52 +1,21 @@
 import dotenv from "dotenv";
-import { createClient } from "@libsql/client";
-import { drizzle } from "drizzle-orm/libsql";
-import { createHash } from "node:crypto";
+import postgres from "postgres";
+import { drizzle } from "drizzle-orm/postgres-js";
 import * as schema from "./schema.js";
 
 dotenv.config({ path: ".env.local" });
 
-const url = (
-  process.env.TURSO_DATABASE_URL ??
-  process.env.STURSO_DATABASE_URL ??
-  "file:local.db"
-).trim();
-const authToken = (
-  process.env.TURSO_AUTH_TOKEN ?? process.env.STURSO_AUTH_TOKEN ?? ""
-).trim();
-const clientUrl =
-  process.env.VERCEL === "1" ? url.replace(/^libsql:/, "https:") : url;
+const connectionString = (process.env.SUPABASE_DATABASE_URL ?? "").trim();
 
-if (process.env.VERCEL === "1" && (!url || url.startsWith("file:"))) {
+if (!connectionString) {
   throw new Error(
-    "TURSO_DATABASE_URL must be configured in Vercel environment variables",
+    "SUPABASE_DATABASE_URL must be configured with the Supabase Postgres connection string",
   );
 }
 
-if (process.env.VERCEL === "1" && !authToken) {
-  throw new Error(
-    "TURSO_AUTH_TOKEN must be configured in Vercel environment variables",
-  );
-}
-
-if (process.env.VERCEL === "1") {
-  console.info("Turso configuration", {
-    protocol: new URL(url).protocol,
-    clientProtocol: new URL(clientUrl).protocol,
-    host: new URL(url).host,
-    path: new URL(url).pathname,
-    tokenPresent: Boolean(authToken),
-    tokenLength: authToken.length,
-    tokenFingerprint: createHash("sha256")
-      .update(authToken)
-      .digest("hex")
-      .slice(0, 12),
-  });
-}
-
-export const client = createClient({
-  url: clientUrl,
-  authToken: url.startsWith("file:") ? undefined : authToken,
+export const client = postgres(connectionString, {
+  max: process.env.VERCEL === "1" ? 1 : 10,
+  prepare: false,
 });
 
 export const db = drizzle(client, { schema });

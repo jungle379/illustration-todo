@@ -58,8 +58,7 @@ function evenSplit(total: number, parts: number) {
 }
 
 async function ensureSchema() {
-  await client.execute(`PRAGMA foreign_keys = ON`);
-  await client.execute(`
+  await client.unsafe(`
     CREATE TABLE IF NOT EXISTS practices (
       id TEXT PRIMARY KEY,
       title TEXT NOT NULL,
@@ -67,18 +66,18 @@ async function ensureSchema() {
       entry_type TEXT NOT NULL,
       date TEXT,
       week_start TEXT,
-      done INTEGER NOT NULL DEFAULT 0,
+      done BOOLEAN NOT NULL DEFAULT FALSE,
       created_at TEXT NOT NULL
     )
   `);
-  await client.execute(`
+  await client.unsafe(`
     CREATE TABLE IF NOT EXISTS practice_days (
       id TEXT PRIMARY KEY,
       practice_id TEXT NOT NULL REFERENCES practices(id) ON DELETE CASCADE,
       date TEXT NOT NULL
     )
   `);
-  await client.execute(`
+  await client.unsafe(`
     CREATE TABLE IF NOT EXISTS events (
       id TEXT PRIMARY KEY,
       title TEXT NOT NULL,
@@ -90,7 +89,7 @@ async function ensureSchema() {
       created_at TEXT NOT NULL
     )
   `);
-  await client.execute(`
+  await client.unsafe(`
     CREATE TABLE IF NOT EXISTS illustration_entries (
       id TEXT PRIMARY KEY,
       event_id TEXT REFERENCES events(id) ON DELETE SET NULL,
@@ -103,7 +102,7 @@ async function ensureSchema() {
       created_at TEXT NOT NULL
     )
   `);
-  await client.execute(`
+  await client.unsafe(`
     CREATE TABLE IF NOT EXISTS illustration_days (
       id TEXT PRIMARY KEY,
       entry_id TEXT NOT NULL REFERENCES illustration_entries(id) ON DELETE CASCADE,

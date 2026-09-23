@@ -1,11 +1,12 @@
 import {
+  boolean,
   index,
   integer,
-  sqliteTable,
+  pgTable,
   text,
-} from "drizzle-orm/sqlite-core";
+} from "drizzle-orm/pg-core";
 
-export const practices = sqliteTable(
+export const practices = pgTable(
   "practices",
   {
     id: text("id").primaryKey(),
@@ -14,7 +15,7 @@ export const practices = sqliteTable(
     entryType: text("entry_type", { enum: ["day", "week"] }).notNull(),
     date: text("date"),
     weekStart: text("week_start"),
-    done: integer("done", { mode: "boolean" }).notNull().default(false),
+    done: boolean("done").notNull().default(false),
     createdAt: text("created_at").notNull(),
   },
   (table) => [
@@ -23,7 +24,7 @@ export const practices = sqliteTable(
   ],
 );
 
-export const practiceDays = sqliteTable(
+export const practiceDays = pgTable(
   "practice_days",
   {
     id: text("id").primaryKey(),
@@ -35,7 +36,7 @@ export const practiceDays = sqliteTable(
   (table) => [index("practice_days_date_idx").on(table.date)],
 );
 
-export const events = sqliteTable(
+export const events = pgTable(
   "events",
   {
     id: text("id").primaryKey(),
@@ -50,7 +51,7 @@ export const events = sqliteTable(
   (table) => [index("events_date_idx").on(table.date)],
 );
 
-export const illustrationEntries = sqliteTable(
+export const illustrationEntries = pgTable(
   "illustration_entries",
   {
     id: text("id").primaryKey(),
@@ -72,7 +73,7 @@ export const illustrationEntries = sqliteTable(
   ],
 );
 
-export const illustrationDays = sqliteTable(
+export const illustrationDays = pgTable(
   "illustration_days",
   {
     id: text("id").primaryKey(),
