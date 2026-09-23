@@ -1,6 +1,7 @@
 import dotenv from "dotenv";
 import { createClient } from "@libsql/client";
 import { drizzle } from "drizzle-orm/libsql";
+import { createHash } from "node:crypto";
 import * as schema from "./schema.js";
 
 dotenv.config({ path: ".env.local" });
@@ -31,6 +32,10 @@ if (process.env.VERCEL === "1") {
     host: new URL(url).host,
     tokenPresent: Boolean(authToken),
     tokenLength: authToken.length,
+    tokenFingerprint: createHash("sha256")
+      .update(authToken)
+      .digest("hex")
+      .slice(0, 12),
   });
 }
 
