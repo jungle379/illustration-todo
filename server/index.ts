@@ -2,14 +2,14 @@ import { serve } from "@hono/node-server";
 import { and, eq, gte, lte } from "drizzle-orm";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import { client, db } from "./db.ts";
+import { client, db } from "./db.js";
 import {
   events,
   illustrationDays,
   illustrationEntries,
   practiceDays,
   practices,
-} from "./schema.ts";
+} from "./schema.js";
 
 export const app = new Hono();
 
