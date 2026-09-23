@@ -2,14 +2,13 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { DailyTodo } from "@/app/types/todo";
 
-export function useDailyTodos(date: string) {
+export function useDailyTodos() {
   return useQuery({
-    queryKey: ["daily-todos", date],
+    queryKey: ["daily-todos"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("daily_todos")
         .select("*")
-        .eq("date", date)
         .order("created_at", { ascending: true });
       if (error) throw error;
       return data as DailyTodo[];
@@ -19,7 +18,7 @@ export function useDailyTodos(date: string) {
 
 export function useDailyTodoMutations(date: string) {
   const queryClient = useQueryClient();
-  const key = ["daily-todos", date];
+  const key = ["daily-todos"];
   const invalidate = () => queryClient.invalidateQueries({ queryKey: key });
 
   const add = useMutation({

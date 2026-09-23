@@ -137,12 +137,14 @@ export default function ClientPage() {
   // -----------------------------
   // APIフック
   const { data: allEvents = [], isLoading, isFetching, error, refetch } = useEvents();
-  const { data: todos = [], isLoading: todosLoading } = useDailyTodos(formattedDate);
+  const { data: allTodos = [], isLoading: todosLoading } = useDailyTodos();
   const todoMutations = useDailyTodoMutations(formattedDate);
-  const { data: logs = [], isLoading: logsLoading } = useIllustrationLogs(formattedDate);
+  const { data: allLogs = [], isLoading: logsLoading } = useIllustrationLogs();
   const logMutations = useIllustrationLogMutations(formattedDate);
 
   const events = allEvents.filter((e) => e.date === formattedDate);
+  const todos = allTodos.filter((todo) => todo.date === formattedDate);
+  const logs = allLogs.filter((log) => log.date === formattedDate);
   const addEvent = useAddEvent();
   const deleteEvent = useDeleteEvent();
   const updateEvent = useUpdateEvent();

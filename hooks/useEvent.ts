@@ -1,14 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 
-export const useEvents = (date?: string) => {
+export const useEvents = () => {
   return useQuery({
-    queryKey: ["events", date ?? "all"],
+    queryKey: ["events"],
     queryFn: async () => {
-      let q = supabase.from("events").select("*");
-      if (date) {
-        q = q.eq("date", date);
-      }
+      const q = supabase.from("events").select("*");
       const { data, error } = await q;
       if (error) throw error;
       return data;

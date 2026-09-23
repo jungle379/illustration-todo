@@ -2,14 +2,13 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { IllustrationLog } from "@/app/types/todo";
 
-export function useIllustrationLogs(date: string) {
+export function useIllustrationLogs() {
   return useQuery({
-    queryKey: ["illustration-logs", date],
+    queryKey: ["illustration-logs"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("illustration_logs")
         .select("*")
-        .eq("date", date)
         .order("created_at", { ascending: false });
       if (error) throw error;
       return data as IllustrationLog[];
@@ -19,7 +18,7 @@ export function useIllustrationLogs(date: string) {
 
 export function useIllustrationLogMutations(date: string) {
   const queryClient = useQueryClient();
-  const key = ["illustration-logs", date];
+  const key = ["illustration-logs"];
   const invalidate = () => queryClient.invalidateQueries({ queryKey: key });
   const add = useMutation({
     mutationFn: async (counts: Pick<IllustrationLog, "large" | "medium" | "small">) => {
