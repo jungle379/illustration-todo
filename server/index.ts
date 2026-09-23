@@ -2,7 +2,7 @@ import { serve } from "@hono/node-server";
 import { and, eq, gte, lte } from "drizzle-orm";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import { client, db } from "./db.js";
+import { db } from "./db.js";
 import {
   events,
   illustrationDays,
@@ -57,63 +57,6 @@ function evenSplit(total: number, parts: number) {
   return Array.from({ length: parts }, (_, i) => base + (i < extra ? 1 : 0));
 }
 
-async function ensureSchema() {
-  await client.unsafe(`
-    CREATE TABLE IF NOT EXISTS practices (
-      id TEXT PRIMARY KEY,
-      title TEXT NOT NULL,
-      notes TEXT NOT NULL DEFAULT '',
-      entry_type TEXT NOT NULL,
-      date TEXT,
-      week_start TEXT,
-      done BOOLEAN NOT NULL DEFAULT FALSE,
-      created_at TEXT NOT NULL
-    )
-  `);
-  await client.unsafe(`
-    CREATE TABLE IF NOT EXISTS practice_days (
-      id TEXT PRIMARY KEY,
-      practice_id TEXT NOT NULL REFERENCES practices(id) ON DELETE CASCADE,
-      date TEXT NOT NULL
-    )
-  `);
-  await client.unsafe(`
-    CREATE TABLE IF NOT EXISTS events (
-      id TEXT PRIMARY KEY,
-      title TEXT NOT NULL,
-      date TEXT NOT NULL,
-      notes TEXT NOT NULL DEFAULT '',
-      large_needed INTEGER NOT NULL DEFAULT 0,
-      medium_needed INTEGER NOT NULL DEFAULT 0,
-      small_needed INTEGER NOT NULL DEFAULT 0,
-      created_at TEXT NOT NULL
-    )
-  `);
-  await client.unsafe(`
-    CREATE TABLE IF NOT EXISTS illustration_entries (
-      id TEXT PRIMARY KEY,
-      event_id TEXT REFERENCES events(id) ON DELETE SET NULL,
-      entry_type TEXT NOT NULL,
-      date TEXT,
-      week_start TEXT,
-      large INTEGER NOT NULL DEFAULT 0,
-      medium INTEGER NOT NULL DEFAULT 0,
-      small INTEGER NOT NULL DEFAULT 0,
-      created_at TEXT NOT NULL
-    )
-  `);
-  await client.unsafe(`
-    CREATE TABLE IF NOT EXISTS illustration_days (
-      id TEXT PRIMARY KEY,
-      entry_id TEXT NOT NULL REFERENCES illustration_entries(id) ON DELETE CASCADE,
-      date TEXT NOT NULL,
-      large INTEGER NOT NULL DEFAULT 0,
-      medium INTEGER NOT NULL DEFAULT 0,
-      small INTEGER NOT NULL DEFAULT 0
-    )
-  `);
-}
-
 type SizeCounts = { large: number; medium: number; small: number };
 
 function addCounts(a: SizeCounts, b: SizeCounts): SizeCounts {
@@ -149,8 +92,10 @@ async function producedByEvent() {
 }
 
 async function withProgress() {
-  const allEvents = await db.select().from(events);
-  const produced = await producedByEvent();
+  const [allEvents, produced] = await Promise.all([
+    db.select().from(events),
+    producedByEvent(),
+  ]);
   return allEvents.map((event) => {
     const done = produced.get(event.id) ?? { large: 0, medium: 0, small: 0 };
     return {
@@ -532,8 +477,6 @@ app.get("/api/summary", async (c) => {
 
 const port = Number(process.env.PORT ?? 3001);
 const hostname = process.env.HOST ?? "0.0.0.0";
-
-await ensureSchema();
 
 if (process.env.VERCEL !== "1") {
   serve({ fetch: app.fetch, port, hostname }, () => {

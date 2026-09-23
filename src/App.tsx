@@ -121,14 +121,22 @@ export function App() {
 
   const load = useCallback(async () => {
     try {
-      const [p, e, i, week, month] = await Promise.all([
-        api.practices(monthFrom, monthTo),
+      const practicesRequest = api.practices(monthFrom, monthTo);
+      const practicesForLoad = practicesRequest.then((nextPractices) => {
+        setPractices(nextPractices);
+        return nextPractices;
+      });
+      const restRequest = Promise.all([
         api.events(),
         api.illustrations(monthFrom, monthTo),
         api.summary(weekFrom, weekTo),
         api.summary(monthFrom, monthTo),
       ]);
-      setPractices(p);
+
+      const [_, [e, i, week, month]] = await Promise.all([
+        practicesForLoad,
+        restRequest,
+      ]);
       setEvents(e);
       setIllustrations(i);
       setWeekSummary(week);
