@@ -29,7 +29,9 @@ if (process.env.VERCEL === "1" && !authToken) {
 
 if (process.env.VERCEL === "1") {
   console.info("Turso configuration", {
+    protocol: new URL(url).protocol,
     host: new URL(url).host,
+    path: new URL(url).pathname,
     tokenPresent: Boolean(authToken),
     tokenLength: authToken.length,
     tokenFingerprint: createHash("sha256")
