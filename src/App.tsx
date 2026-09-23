@@ -180,9 +180,7 @@ export function App() {
       const summaryStarts = Array.from(
         new Set([...monthWeekStarts(monthFrom, monthTo), weekFrom]),
       );
-      const [p, e, i, summaries] = await Promise.all([
-        api.practices(weekFrom, weekTo),
-        api.events(),
+      const [i, summaries] = await Promise.all([
         api.illustrations(weekFrom, weekTo),
         Promise.all(
           summaryStarts.map((start) => api.summary(start, weekEndOf(start))),
@@ -190,11 +188,16 @@ export function App() {
       ]);
       const week = summaries.find((summary) => summary.from === weekFrom);
       if (!week) throw new Error("週次サマリーを取得できませんでした");
-      setPractices(p);
-      setEvents(e);
       setIllustrations(i);
       setWeekSummary(week);
       setMonthSummary(combineSummaries(summaries, monthFrom, monthTo));
+
+      const [p, e] = await Promise.all([
+        api.practices(monthFrom, monthTo),
+        api.events(),
+      ]);
+      setPractices(p);
+      setEvents(e);
     } catch (error) {
       toast.error(
         `読み込みに失敗しました: ${
