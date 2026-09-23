@@ -15,6 +15,8 @@ The Vite client runs on `http://localhost:5173` and the API server runs on `http
 
 ```bash
 npm run build
+npm start
 ```
 
-For Turso, set `TURSO_DATABASE_URL` and `TURSO_AUTH_TOKEN` before running `npm run db:push`.
+The production server serves the Vite build and the `/api` endpoints from the same port.
+Set `TURSO_DATABASE_URL` and `TURSO_AUTH_TOKEN` before running `npm run db:push` or `npm start`.

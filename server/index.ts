@@ -11,7 +11,7 @@ import {
   practices,
 } from "./schema.ts";
 
-const app = new Hono();
+export const app = new Hono();
 
 app.use(
   "/api/*",
@@ -519,9 +519,12 @@ app.get("/api/summary", async (c) => {
 });
 
 const port = Number(process.env.PORT ?? 3001);
+const hostname = process.env.HOST ?? "0.0.0.0";
 
 await ensureSchema();
 
-serve({ fetch: app.fetch, port, hostname: "127.0.0.1" }, () => {
-  console.log(`API listening on http://127.0.0.1:${port}`);
-});
+if (process.env.VERCEL !== "1") {
+  serve({ fetch: app.fetch, port, hostname }, () => {
+    console.log(`Server listening on http://${hostname}:${port}`);
+  });
+}
