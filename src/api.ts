@@ -1,17 +1,27 @@
 import type { EventItem, IllustrationEntry, Practice, Summary } from "./types";
 
+let requestQueue = Promise.resolve();
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(path, {
-    headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
-    ...init,
+  const run = requestQueue.then(async () => {
+    const res = await fetch(path, {
+      headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
+      ...init,
+    });
+    if (!res.ok) {
+      const details = await res.text();
+      throw new Error(
+        `${res.status} ${res.statusText} (${path})${details ? `: ${details}` : ""}`,
+      );
+    }
+    return res.json() as Promise<T>;
   });
-  if (!res.ok) {
-    const details = await res.text();
-    throw new Error(
-      `${res.status} ${res.statusText} (${path})${details ? `: ${details}` : ""}`,
-    );
-  }
-  return res.json() as Promise<T>;
+
+  requestQueue = run.then(
+    () => undefined,
+    () => undefined,
+  );
+  return run;
 }
 
 export const api = {

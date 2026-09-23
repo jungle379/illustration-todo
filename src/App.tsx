@@ -31,7 +31,7 @@ import {
   IconRefresh,
   IconTrash,
 } from "@tabler/icons-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { api } from "./api";
 import {
@@ -173,6 +173,26 @@ export function App() {
   const monthTo = monthEndOf(cursor);
   const weekFrom = weekStartOf(selected);
   const weekTo = weekEndOf(selected);
+  const summaryCache = useRef(new Map<string, Promise<Summary>>());
+  const practiceCache = useRef(new Map<string, Promise<Practice[]>>());
+  const illustrationCache = useRef(
+    new Map<string, Promise<IllustrationEntry[]>>(),
+  );
+
+  const cached = useCallback(<T,>(
+    cache: Map<string, Promise<T>>,
+    key: string,
+    request: () => Promise<T>,
+  ) => {
+    const existing = cache.get(key);
+    if (existing) return existing;
+    const pending = request().catch((error) => {
+      cache.delete(key);
+      throw error;
+    });
+    cache.set(key, pending);
+    return pending;
+  }, []);
 
   const loadSummaries = useCallback(async () => {
     const summaryStarts = Array.from(
@@ -180,23 +200,41 @@ export function App() {
     );
     const summaries: Summary[] = [];
     for (const start of summaryStarts) {
-      summaries.push(await api.summary(start, weekEndOf(start)));
+      const end = weekEndOf(start);
+      summaries.push(
+        await cached(summaryCache.current, `${start}:${end}`, () =>
+          api.summary(start, end),
+        ),
+      );
     }
     const week = summaries.find((summary) => summary.from === weekFrom);
     if (!week) throw new Error("週次サマリーを取得できませんでした");
     setWeekSummary(week);
     setMonthSummary(combineSummaries(summaries, monthFrom, monthTo));
-  }, [monthFrom, monthTo, weekFrom]);
+  }, [cached, monthFrom, monthTo, weekFrom]);
 
   const loadPractices = useCallback(async () => {
-    setPractices(await api.practices(monthFrom, monthTo));
-  }, [monthFrom, monthTo]);
+    setPractices(
+      await cached(practiceCache.current, `${monthFrom}:${monthTo}`, () =>
+        api.practices(monthFrom, monthTo),
+      ),
+    );
+  }, [cached, monthFrom, monthTo]);
 
   const loadIllustrations = useCallback(async () => {
-    setIllustrations(await api.illustrations(weekFrom, weekTo));
-  }, [weekFrom, weekTo]);
+    setIllustrations(
+      await cached(illustrationCache.current, `${weekFrom}:${weekTo}`, () =>
+        api.illustrations(weekFrom, weekTo),
+      ),
+    );
+  }, [cached, weekFrom, weekTo]);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (force = false) => {
+    if (force) {
+      summaryCache.current.clear();
+      practiceCache.current.clear();
+      illustrationCache.current.clear();
+    }
     setIsLoading(true);
     try {
       await loadIllustrations();
@@ -214,13 +252,27 @@ export function App() {
   }, [loadIllustrations, loadPractices, loadSummaries]);
 
   const refreshPracticeData = useCallback(async () => {
-    await loadPractices();
-    await loadSummaries();
+    practiceCache.current.clear();
+    summaryCache.current.clear();
+    setIsLoading(true);
+    try {
+      await loadPractices();
+      await loadSummaries();
+    } finally {
+      setIsLoading(false);
+    }
   }, [loadPractices, loadSummaries]);
 
   const refreshIllustrationData = useCallback(async () => {
-    await loadIllustrations();
-    await loadSummaries();
+    illustrationCache.current.clear();
+    summaryCache.current.clear();
+    setIsLoading(true);
+    try {
+      await loadIllustrations();
+      await loadSummaries();
+    } finally {
+      setIsLoading(false);
+    }
   }, [loadIllustrations, loadSummaries]);
 
   useEffect(() => {
@@ -299,7 +351,7 @@ export function App() {
             <Button
               variant="default"
               leftSection={<IconRefresh size={16} />}
-              onClick={() => void load()}
+              onClick={() => void load(true)}
             >
               更新
             </Button>
