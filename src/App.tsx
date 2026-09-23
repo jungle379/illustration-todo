@@ -174,26 +174,34 @@ export function App() {
   const weekFrom = weekStartOf(selected);
   const weekTo = weekEndOf(selected);
 
+  const loadSummaries = useCallback(async () => {
+    const summaryStarts = Array.from(
+      new Set([...monthWeekStarts(monthFrom, monthTo), weekFrom]),
+    );
+    const summaries: Summary[] = [];
+    for (const start of summaryStarts) {
+      summaries.push(await api.summary(start, weekEndOf(start)));
+    }
+    const week = summaries.find((summary) => summary.from === weekFrom);
+    if (!week) throw new Error("週次サマリーを取得できませんでした");
+    setWeekSummary(week);
+    setMonthSummary(combineSummaries(summaries, monthFrom, monthTo));
+  }, [monthFrom, monthTo, weekFrom]);
+
+  const loadPractices = useCallback(async () => {
+    setPractices(await api.practices(monthFrom, monthTo));
+  }, [monthFrom, monthTo]);
+
+  const loadIllustrations = useCallback(async () => {
+    setIllustrations(await api.illustrations(weekFrom, weekTo));
+  }, [weekFrom, weekTo]);
+
   const load = useCallback(async () => {
     setIsLoading(true);
     try {
-      const summaryStarts = Array.from(
-        new Set([...monthWeekStarts(monthFrom, monthTo), weekFrom]),
-      );
-      const [i, summaries] = await Promise.all([
-        api.illustrations(weekFrom, weekTo),
-        Promise.all(
-          summaryStarts.map((start) => api.summary(start, weekEndOf(start))),
-        ),
-      ]);
-      const week = summaries.find((summary) => summary.from === weekFrom);
-      if (!week) throw new Error("週次サマリーを取得できませんでした");
-      setIllustrations(i);
-      setWeekSummary(week);
-      setMonthSummary(combineSummaries(summaries, monthFrom, monthTo));
-
-      const p = await api.practices(monthFrom, monthTo);
-      setPractices(p);
+      await loadIllustrations();
+      await loadSummaries();
+      await loadPractices();
     } catch (error) {
       toast.error(
         `読み込みに失敗しました: ${
@@ -203,7 +211,17 @@ export function App() {
     } finally {
       setIsLoading(false);
     }
-  }, [monthFrom, monthTo, weekFrom, weekTo]);
+  }, [loadIllustrations, loadPractices, loadSummaries]);
+
+  const refreshPracticeData = useCallback(async () => {
+    await loadPractices();
+    await loadSummaries();
+  }, [loadPractices, loadSummaries]);
+
+  const refreshIllustrationData = useCallback(async () => {
+    await loadIllustrations();
+    await loadSummaries();
+  }, [loadIllustrations, loadSummaries]);
 
   useEffect(() => {
     void load();
@@ -285,6 +303,7 @@ export function App() {
             >
               更新
             </Button>
+            {/*
             <Button
               leftSection={<IconPlus size={16} />}
               onClick={() => {
@@ -294,6 +313,7 @@ export function App() {
             >
               イベントを追加
             </Button>
+            */}
           </Group>
         </Group>
       </AppShell.Header>
@@ -427,7 +447,8 @@ export function App() {
                     entry.days.some((day) => day.date === selected),
                 )}
                 produced={producedByDate.get(selected) ?? emptyCounts}
-                onChanged={load}
+                onPracticeChanged={refreshPracticeData}
+                onIllustrationChanged={refreshIllustrationData}
                 onEditEvent={(event) => {
                   setEditingEvent(event);
                   eventModal.open();
@@ -442,7 +463,8 @@ export function App() {
                   (entry) => entry.weekStart === weekFrom,
                 )}
                 producedByDate={producedByDate}
-                onChanged={load}
+                onPracticeChanged={refreshPracticeData}
+                onIllustrationChanged={refreshIllustrationData}
               />
             )}
           </Stack>
@@ -456,7 +478,6 @@ export function App() {
         defaultDate={selected}
         onSaved={async () => {
           eventModal.close();
-          await load();
         }}
       />
     </AppShell>
@@ -470,7 +491,8 @@ function DayPanel({
   dayEvents,
   illustrations,
   produced,
-  onChanged,
+  onPracticeChanged,
+  onIllustrationChanged,
   onEditEvent,
 }: {
   date: string;
@@ -479,7 +501,8 @@ function DayPanel({
   dayEvents: EventItem[];
   illustrations: IllustrationEntry[];
   produced: SizeCounts;
-  onChanged: () => Promise<void>;
+  onPracticeChanged: () => Promise<void>;
+  onIllustrationChanged: () => Promise<void>;
   onEditEvent: (event: EventItem) => void;
 }) {
   const [title, setTitle] = useState("");
@@ -582,7 +605,7 @@ function DayPanel({
                   api.deletePractice(practice.id),
                   "練習を削除しました",
                 );
-                await onChanged();
+                await onPracticeChanged();
               }}
             >
               <IconTrash size={16} />
@@ -609,7 +632,7 @@ function DayPanel({
               "練習を追加しました",
             );
             setTitle("");
-            await onChanged();
+            await onPracticeChanged();
           }}
         >
           追加
@@ -664,7 +687,7 @@ function DayPanel({
             "実績を保存しました",
           );
           setCounts(emptyCounts);
-          await onChanged();
+          await onIllustrationChanged();
         }}
       >
         実績を保存
@@ -683,7 +706,7 @@ function DayPanel({
                   api.deleteIllustration(entry.id),
                   "実績を削除しました",
                 );
-                await onChanged();
+                await onIllustrationChanged();
               }}
             >
               <IconTrash size={16} />
@@ -700,14 +723,16 @@ function WeekPanel({
   events,
   illustrations,
   producedByDate,
-  onChanged,
+  onPracticeChanged,
+  onIllustrationChanged,
 }: {
   weekStart: string;
   practices: Practice[];
   events: EventItem[];
   illustrations: IllustrationEntry[];
   producedByDate: Map<string, SizeCounts>;
-  onChanged: () => Promise<void>;
+  onPracticeChanged: () => Promise<void>;
+  onIllustrationChanged: () => Promise<void>;
 }) {
   const dates = weekDates(weekStart);
   const [title, setTitle] = useState("");
@@ -786,7 +811,7 @@ function WeekPanel({
             "週の練習を追加しました",
           );
           setTitle("");
-          await onChanged();
+          await onPracticeChanged();
         }}
       >
         週の練習を追加
@@ -804,7 +829,7 @@ function WeekPanel({
                 api.deletePractice(practice.id),
                 "練習を削除しました",
               );
-              await onChanged();
+              await onPracticeChanged();
             }}
           >
             <IconTrash size={16} />
@@ -936,7 +961,7 @@ function WeekPanel({
           );
           setTotals(emptyCounts);
           setSplit(dates.map(() => emptyCounts));
-          await onChanged();
+          await onIllustrationChanged();
         }}
       >
         週の実績を保存
@@ -953,7 +978,7 @@ function WeekPanel({
                 api.deleteIllustration(entry.id),
                 "実績を削除しました",
               );
-              await onChanged();
+              await onIllustrationChanged();
             }}
           >
             <IconTrash size={16} />
