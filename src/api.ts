@@ -6,7 +6,10 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     ...init,
   });
   if (!res.ok) {
-    throw new Error(`${res.status} ${res.statusText}`);
+    const details = await res.text();
+    throw new Error(
+      `${res.status} ${res.statusText} (${path})${details ? `: ${details}` : ""}`,
+    );
   }
   return res.json() as Promise<T>;
 }
@@ -25,7 +28,7 @@ export const api = {
       body: JSON.stringify(body),
     }),
   deletePractice: (id: string) =>
-    request(`/api/practices/${id}`, { method: "DELETE" }),
+    request(`/api/practices/${encodeURIComponent(id)}`, { method: "DELETE" }),
 
   events: () => request<EventItem[]>("/api/events"),
   createEvent: (body: unknown) =>
@@ -39,7 +42,7 @@ export const api = {
       body: JSON.stringify(body),
     }),
   deleteEvent: (id: string) =>
-    request(`/api/events/${id}`, { method: "DELETE" }),
+    request(`/api/events/${encodeURIComponent(id)}`, { method: "DELETE" }),
 
   illustrations: (from: string, to: string) =>
     request<IllustrationEntry[]>(`/api/illustrations?from=${from}&to=${to}`),
@@ -54,7 +57,9 @@ export const api = {
       body: JSON.stringify(body),
     }),
   deleteIllustration: (id: string) =>
-    request(`/api/illustrations/${id}`, { method: "DELETE" }),
+    request(`/api/illustrations/${encodeURIComponent(id)}`, {
+      method: "DELETE",
+    }),
 
   summary: (from: string, to: string) =>
     request<Summary>(`/api/summary?from=${from}&to=${to}`),

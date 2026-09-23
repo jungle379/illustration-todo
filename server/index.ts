@@ -212,6 +212,7 @@ app.patch("/api/practices/:id", async (c) => {
 });
 
 app.delete("/api/practices/:id", async (c) => {
+  console.info("DELETE practice", c.req.param("id"));
   await db.delete(practices).where(eq(practices.id, c.req.param("id")));
   return c.json({ ok: true });
 });
@@ -274,6 +275,7 @@ app.patch("/api/events/:id", async (c) => {
 });
 
 app.delete("/api/events/:id", async (c) => {
+  console.info("DELETE event", c.req.param("id"));
   await db.delete(events).where(eq(events.id, c.req.param("id")));
   return c.json({ ok: true });
 });
@@ -405,6 +407,7 @@ app.patch("/api/illustrations/:id", async (c) => {
 });
 
 app.delete("/api/illustrations/:id", async (c) => {
+  console.info("DELETE illustration", c.req.param("id"));
   await db.delete(illustrationEntries).where(
     eq(illustrationEntries.id, c.req.param("id")),
   );
