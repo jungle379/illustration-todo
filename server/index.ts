@@ -220,8 +220,12 @@ app.delete("/api/practices/:id", async (c) => {
 app.get("/api/events", async (c) => {
   const from = c.req.query("from");
   const to = c.req.query("to");
+  const query = c.req.query("q")?.trim();
   const items = await withProgress();
   const filtered = items.filter((event) => {
+    if (query && !event.title.toLocaleLowerCase().includes(query.toLocaleLowerCase())) {
+      return false;
+    }
     if (!from || !to) return true;
     return event.date >= from && event.date <= to;
   });

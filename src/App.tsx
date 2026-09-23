@@ -161,7 +161,7 @@ export function App() {
   const [cursor, setCursor] = useState(iso(new Date()));
   const [selected, setSelected] = useState(iso(new Date()));
   const [mode, setMode] = useState<"day" | "week">("day");
-  const [events] = useState<EventItem[]>([]);
+  const [events, setEvents] = useState<EventItem[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [eventOpened, eventModal] = useDisclosure(false);
   const [editingEvent, setEditingEvent] = useState<EventItem | null>(null);
@@ -227,6 +227,10 @@ export function App() {
       setIsRefreshing(false);
     }
   }, [illustrationsQuery, queryClient, refreshSummaries]);
+
+  const refreshEvents = useCallback(async () => {
+    setEvents(await api.events());
+  }, []);
 
   const refreshAllData = useCallback(async () => {
     setIsRefreshing(true);
@@ -324,7 +328,6 @@ export function App() {
             >
               更新
             </Button>
-            {/*
             <Button
               leftSection={<IconPlus size={16} />}
               onClick={() => {
@@ -334,7 +337,6 @@ export function App() {
             >
               イベントを追加
             </Button>
-            */}
           </Group>
         </Group>
       </AppShell.Header>
@@ -499,6 +501,7 @@ export function App() {
         defaultDate={selected}
         onSaved={async () => {
           eventModal.close();
+          await refreshEvents();
         }}
       />
     </AppShell>

@@ -40,7 +40,10 @@ export const api = {
   deletePractice: (id: string) =>
     request(`/api/practices/${encodeURIComponent(id)}`, { method: "DELETE" }),
 
-  events: () => request<EventItem[]>("/api/events"),
+  events: (query = "") =>
+    request<EventItem[]>(
+      `/api/events${query ? `?q=${encodeURIComponent(query)}` : ""}`,
+    ),
   createEvent: (body: unknown) =>
     request<{ id: string }>("/api/events", {
       method: "POST",
