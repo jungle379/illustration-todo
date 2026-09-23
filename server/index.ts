@@ -13,6 +13,15 @@ import {
 
 export const app = new Hono();
 
+app.onError((error, c) => {
+  console.error("API request failed", {
+    method: c.req.method,
+    path: c.req.path,
+    error,
+  });
+  return c.json({ error: "Internal server error" }, 500);
+});
+
 app.use(
   "/api/*",
   cors({
