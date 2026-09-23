@@ -192,12 +192,8 @@ export function App() {
       setWeekSummary(week);
       setMonthSummary(combineSummaries(summaries, monthFrom, monthTo));
 
-      const [p, e] = await Promise.all([
-        api.practices(monthFrom, monthTo),
-        api.events(),
-      ]);
+      const p = await api.practices(monthFrom, monthTo);
       setPractices(p);
-      setEvents(e);
     } catch (error) {
       toast.error(
         `読み込みに失敗しました: ${
